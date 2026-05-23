@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Spawnet development server and packager."""
+"""chronoGamer development server and packager."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 
-APP_NAME = "Spawnet"
+APP_NAME = "chronoGamer"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 1337
 ROOT_DIR = Path(__file__).resolve().parent
@@ -63,7 +63,7 @@ def load_route_bytes(route: str) -> tuple[bytes | None, str]:
     return file_path.read_bytes(), mime_type
 
 
-class SpawnetHandler(BaseHTTPRequestHandler):
+class ChronoHandler(BaseHTTPRequestHandler):
     def serve_route(self, include_body: bool) -> None:
         route = self.path.split("?", 1)[0]
         if route == "/":
@@ -89,11 +89,11 @@ class SpawnetHandler(BaseHTTPRequestHandler):
         self.serve_route(include_body=False)
 
     def log_message(self, fmt: str, *args: object) -> None:
-        sys.stdout.write(f"[spawnet] {self.address_string()} - {fmt % args}\n")
+        sys.stdout.write(f"[chronoGamer] {self.address_string()} - {fmt % args}\n")
 
 
 def run_server(host: str, port: int) -> None:
-    server = ThreadingHTTPServer((host, port), SpawnetHandler)
+    server = ThreadingHTTPServer((host, port), ChronoHandler)
     print(f"Serving {APP_NAME} on http://{host}:{port}")
     try:
         server.serve_forever()
@@ -126,7 +126,7 @@ def ensure_output_path(mode: str, output: str | None) -> Path:
         if not candidate.is_absolute() and candidate.parent == Path("."):
             candidate = BIN_DIR / candidate
     else:
-        candidate = BIN_DIR / f"spawnet{suffix}"
+        candidate = BIN_DIR / f"chronoGamer{suffix}"
 
     if candidate.suffix.lower() != suffix:
         candidate = candidate.with_suffix(suffix)
@@ -142,7 +142,7 @@ def build_python_file(output_path: Path) -> Path:
 
 def build_zipapp(output_path: Path) -> Path:
     source_text = build_source_text()
-    with tempfile.TemporaryDirectory(prefix="spawnet-pyz-") as temp_dir:
+    with tempfile.TemporaryDirectory(prefix="chronogamer-pyz-") as temp_dir:
         temp_path = Path(temp_dir)
         main_file = temp_path / "__main__.py"
         main_file.write_text(source_text, encoding="utf-8")
@@ -158,7 +158,7 @@ def build_windows_exe(output_path: Path) -> Path:
     if sys.platform != "win32":
         raise RuntimeError(
             "Windows .exe builds must be run on Windows. "
-            "Use `uv run spawn.py build --mode py` or `--mode pyz` on Linux/macOS."
+            "Use `uv run chrono.py build --mode py` or `--mode pyz` on Linux/macOS."
         )
 
     if shutil.which("pyinstaller") is None:
@@ -171,9 +171,9 @@ def build_windows_exe(output_path: Path) -> Path:
             ) from exc
 
     source_text = build_source_text()
-    with tempfile.TemporaryDirectory(prefix="spawnet-exe-") as temp_dir:
+    with tempfile.TemporaryDirectory(prefix="chronogamer-exe-") as temp_dir:
         temp_path = Path(temp_dir)
-        source_file = temp_path / "spawnet_embedded.py"
+        source_file = temp_path / "chronogamer_embedded.py"
         work_dir = temp_path / "build"
         spec_dir = temp_path / "spec"
         dist_dir = output_path.parent
@@ -213,7 +213,7 @@ def build_artifact(mode: str, output: str | None) -> Path:
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Spawnet development server and build tool.",
+        description="chronoGamer development server and build tool.",
     )
     subparsers = parser.add_subparsers(dest="command")
 

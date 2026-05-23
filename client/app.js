@@ -1,299 +1,401 @@
-const ICONS = {
-  play: `
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M8 5.14v13.72c0 .74.8 1.2 1.44.82l10.1-6.86a.95.95 0 0 0 0-1.64L9.44 4.32A.95.95 0 0 0 8 5.14Z"></path>
-    </svg>
-  `,
-  pause: `
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M7 5h4v14H7zm6 0h4v14h-4z"></path>
-    </svg>
-  `,
-  step: `
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M6 5h3v14H6zm5 1.14v11.72c0 .74.8 1.2 1.44.82l8.1-5.86a.95.95 0 0 0 0-1.64l-8.1-5.86a.95.95 0 0 0-1.44.82Z"></path>
-    </svg>
-  `,
-  reset: `
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 5a7 7 0 1 1-6.7 9h2.11A5 5 0 1 0 12 7c-1.38 0-2.63.56-3.54 1.46L11 11H4V4l2.05 2.05A8.96 8.96 0 0 1 12 5Z"></path>
-    </svg>
-  `,
+/* chronoGamer — retro game timeline browser */
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+const SEARCH_DEBOUNCE  = 150;
+const ROW_HEIGHT_GAME  = 46;
+const ROW_HEIGHT_HDR   = 34;
+
+const CONSOLE_COLORS = {
+  "Atari 2600":    "#e03a3a",
+  "Atari 7800":    "#c94040",
+  "NES":           "#e60012",
+  "SMS":           "#1a6bbf",
+  "TurboGrafx-16": "#9e9e9e",
+  "Game Boy":      "#8bac0f",
+  "Genesis":       "#0077cc",
+  "SNES":          "#9400d3",
+  "Neo Geo":       "#ff8c00",
+  "Sega CD":       "#005b9a",
+  "3DO":           "#c8960c",
+  "32X":           "#0099cc",
+  "PlayStation":   "#0070d1",
+  "Saturn":        "#3949ab",
+  "N64":           "#e4000f",
+  "Game Boy Color":"#f0a500",
+  "Dreamcast":     "#e45c00",
 };
 
-const canvas = document.getElementById("life-canvas");
-const ctx = canvas.getContext("2d");
+// ─── State ───────────────────────────────────────────────────────────────────
 
-const playButton = document.getElementById("play-toggle");
-const stepButton = document.getElementById("step-button");
-const resetButton = document.getElementById("reset-button");
-const fpsSlider = document.getElementById("fps-slider");
-const fpsOutput = document.getElementById("fps-output");
-const cellSizeSlider = document.getElementById("cell-size-slider");
-const cellSizeOutput = document.getElementById("cell-size-output");
+const REGIONS = ["NA", "JP", "PAL"];
+
+const REGION_LABELS = { NA: "NA", JP: "JP", PAL: "PAL" };
 
 const state = {
-  width: 0,
-  height: 0,
-  cols: 0,
-  rows: 0,
-  cellSize: Number(cellSizeSlider.value),
-  fps: Number(fpsSlider.value),
-  playing: true,
-  drawing: false,
-  drawValue: 1,
-  cells: new Uint8Array(),
-  next: new Uint8Array(),
-  lastTick: 0,
+  allGames:       [],
+  filtered:       [],
+  activeConsoles: new Set(),
+  activeRegions:  new Set(REGIONS),
+  searchQuery:    "",
+  dateFrom:       null,
+  // year → pixel offset from top of game-list (computed at render time)
+  yearOffsets:    {},
+  totalHeight:    0,
 };
 
-function indexOfCell(col, row) {
-  return row * state.cols + col;
+// ─── DOM refs ─────────────────────────────────────────────────────────────────
+
+const scrollContainer = document.getElementById("scroll-container");
+const gameList        = document.getElementById("game-list");
+const timelineBar     = document.getElementById("timeline-bar");
+const timelineLabels  = document.getElementById("timeline-labels");
+const timelineHandle  = document.getElementById("timeline-handle");
+const consoleFilters  = document.getElementById("console-filters");
+const regionFilters   = document.getElementById("region-filters");
+const gameCount       = document.getElementById("game-count");
+const loading         = document.getElementById("loading");
+const wordmark        = document.getElementById("wordmark");
+
+// ─── Data loading ─────────────────────────────────────────────────────────────
+
+async function loadGames() {
+  const res = await fetch("/games.json");
+  state.allGames = await res.json();
+
+  const consoles = [...new Set(state.allGames.map(g => g.console))].sort();
+  state.activeConsoles = new Set(consoles);
+
+  buildConsoleFilters(consoles);
+  buildRegionFilters();
+  initTimeline();
+  applyFilters();
+
+  loading.style.display = "none";
 }
 
-function setButtonIcons() {
-  playButton.innerHTML = state.playing ? ICONS.pause : ICONS.play;
-  playButton.classList.toggle("is-active", state.playing);
-  playButton.setAttribute(
-    "aria-label",
-    state.playing ? "Pause simulation" : "Play simulation",
-  );
-  stepButton.innerHTML = ICONS.step;
-  resetButton.innerHTML = ICONS.reset;
+// ─── Filtering & rendering ────────────────────────────────────────────────────
+
+function applyFilters() {
+  const q       = state.searchQuery.toLowerCase();
+  const fromISO = state.dateFrom ? state.dateFrom.toISOString().slice(0, 10) : null;
+
+  state.filtered = state.allGames.filter(g => {
+    if (!state.activeConsoles.has(g.console)) return false;
+    if (fromISO && g.releaseDate < fromISO) return false;
+    if (q && !g.title.toLowerCase().includes(q)) return false;
+    const gameRegions = g.regions || ["NA"];
+    if (!gameRegions.some(r => state.activeRegions.has(r))) return false;
+    return true;
+  });
+
+  gameCount.textContent = state.filtered.length.toLocaleString() + " games";
+  renderList();
+  syncTimelineHandle();
 }
 
-function resizeBoard({ resetPattern = false } = {}) {
-  const dpr = window.devicePixelRatio || 1;
-  state.width = window.innerWidth;
-  state.height = window.innerHeight;
-  canvas.width = Math.floor(state.width * dpr);
-  canvas.height = Math.floor(state.height * dpr);
-  canvas.style.width = `${state.width}px`;
-  canvas.style.height = `${state.height}px`;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+function renderList() {
+  const frag       = document.createDocumentFragment();
+  let lastYear     = null;
+  let offset       = 0;
+  const yearOffsets = {};
 
-  const nextCols = Math.max(8, Math.floor(state.width / state.cellSize));
-  const nextRows = Math.max(8, Math.floor(state.height / state.cellSize));
-  const sizeChanged = nextCols !== state.cols || nextRows !== state.rows;
-
-  if (!sizeChanged && !resetPattern) {
-    draw();
-    return;
+  for (const g of state.filtered) {
+    const year = g.releaseDate.slice(0, 4);
+    if (year !== lastYear) {
+      yearOffsets[year] = offset;
+      frag.appendChild(createHeaderRow(year));
+      offset  += ROW_HEIGHT_HDR;
+      lastYear = year;
+    }
+    frag.appendChild(createGameRow(g));
+    offset += ROW_HEIGHT_GAME;
   }
 
-  state.cols = nextCols;
-  state.rows = nextRows;
-  state.cells = new Uint8Array(state.cols * state.rows);
-  state.next = new Uint8Array(state.cols * state.rows);
-  seedHelloWord();
-  draw();
+  state.yearOffsets = yearOffsets;
+  state.totalHeight = offset;
+
+  gameList.textContent = "";
+  gameList.appendChild(frag);
+
+  positionTimelineLabels();
 }
 
-function seedHelloWord() {
-  state.cells.fill(0);
+function createHeaderRow(year) {
+  const row = document.createElement("div");
+  row.className = "year-header";
+  row.dataset.year = year;
+  row.textContent = year;
+  return row;
+}
 
-  const offscreen = document.createElement("canvas");
-  const offCtx = offscreen.getContext("2d", { willReadFrequently: true });
-  offscreen.width = state.cols;
-  offscreen.height = state.rows;
+function createGameRow(game) {
+  const row = document.createElement("div");
+  row.className = "game-row";
 
-  offCtx.clearRect(0, 0, offscreen.width, offscreen.height);
-  offCtx.fillStyle = "#ffffff";
-  offCtx.textAlign = "center";
-  offCtx.textBaseline = "middle";
-  let fontSize = Math.max(12, Math.floor(Math.min(state.cols * 0.11, state.rows * 0.52)));
-  do {
-    offCtx.font = `900 ${fontSize}px "Arial Black", "Segoe UI", sans-serif`;
-    fontSize -= 1;
-  } while (fontSize > 12 && offCtx.measureText("HELLO WORLD").width > state.cols * 0.9);
+  const dateEl = document.createElement("span");
+  dateEl.className = "col-date";
+  dateEl.textContent = formatDate(game.releaseDate);
 
-  offCtx.font = `900 ${fontSize}px "Arial Black", "Segoe UI", sans-serif`;
-  offCtx.fillText("HELLO WORLD", state.cols / 2, state.rows / 2);
+  const badge = document.createElement("span");
+  badge.className = "console-badge col-console";
+  badge.textContent = game.console;
+  badge.style.setProperty("--badge-color", CONSOLE_COLORS[game.console] || "#888");
 
-  const pixels = offCtx.getImageData(0, 0, state.cols, state.rows).data;
-  for (let row = 0; row < state.rows; row += 1) {
-    for (let col = 0; col < state.cols; col += 1) {
-      const alpha = pixels[(row * state.cols + col) * 4 + 3];
-      if (alpha > 64) {
-        state.cells[indexOfCell(col, row)] = 1;
-      }
+  const titleEl = document.createElement("span");
+  titleEl.className = "col-title";
+  titleEl.textContent = game.title;
+
+  row.appendChild(dateEl);
+  row.appendChild(badge);
+  row.appendChild(titleEl);
+  return row;
+}
+
+function formatDate(iso) {
+  const [y, m, d] = iso.split("-");
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const month = months[parseInt(m, 10) - 1];
+  if (d === "01" && iso.endsWith("-01")) return `${month} ${y}`;
+  return `${month} ${parseInt(d, 10)}, ${y}`;
+}
+
+// ─── Timeline slider ─────────────────────────────────────────────────────────
+//
+// Labels are placed at even year intervals (1977–2000).
+// The handle and drag both work in that same even year-space so clicking
+// on "1991" actually scrolls to 1991, not to 61% of content height.
+//
+// yearToBarFrac  : year  → 0-1 even position on the bar
+// scrollToBarFrac: scrollTop → 0-1 by interpolating between known year offsets
+// barFracToScroll: 0-1 bar fraction → scrollTop by reverse interpolation
+
+const YEAR_MIN = 1977;
+const YEAR_MAX = 2000;
+
+function yearToBarFrac(year) {
+  return (year - YEAR_MIN) / (YEAR_MAX - YEAR_MIN);
+}
+
+function sortedYears() {
+  return Object.keys(state.yearOffsets).map(Number).sort((a, b) => a - b);
+}
+
+// Converts current scrollTop → bar fraction in even year-space
+function scrollToBarFrac() {
+  const scrollTop = scrollContainer.scrollTop;
+  const years = sortedYears();
+  if (!years.length) return 0;
+
+  // Find the last year whose offset is ≤ scrollTop
+  let loIdx = 0;
+  for (let i = 0; i < years.length; i++) {
+    if (state.yearOffsets[years[i]] <= scrollTop + 1) loIdx = i;
+    else break;
+  }
+  const hiIdx = Math.min(loIdx + 1, years.length - 1);
+  if (loIdx === hiIdx) return yearToBarFrac(years[loIdx]);
+
+  const loYear = years[loIdx], hiYear = years[hiIdx];
+  const loOff  = state.yearOffsets[loYear], hiOff = state.yearOffsets[hiYear];
+  const t = hiOff === loOff ? 0 : (scrollTop - loOff) / (hiOff - loOff);
+  return yearToBarFrac(loYear) + t * (yearToBarFrac(hiYear) - yearToBarFrac(loYear));
+}
+
+// Converts a bar fraction (drag position) → scrollTop via year interpolation
+function barFracToScroll(frac) {
+  const yearF = YEAR_MIN + frac * (YEAR_MAX - YEAR_MIN);
+  const years = sortedYears();
+  if (!years.length) return 0;
+
+  // Find surrounding known years
+  let loYear = years[0];
+  for (const y of years) {
+    if (y <= yearF) loYear = y;
+  }
+  const loIdx = years.indexOf(loYear);
+  const hiIdx = Math.min(loIdx + 1, years.length - 1);
+  if (loIdx === hiIdx) return state.yearOffsets[loYear];
+
+  const hiYear = years[hiIdx];
+  const t = (yearF - loYear) / (hiYear - loYear);
+  return state.yearOffsets[loYear] + t * (state.yearOffsets[hiYear] - state.yearOffsets[loYear]);
+}
+
+function initTimeline() {
+  for (let year = YEAR_MIN; year <= YEAR_MAX; year++) {
+    const label = document.createElement("span");
+    label.className = "tl-label";
+    label.dataset.year = year;
+    label.textContent = year;
+    label.addEventListener("click", e => {
+      e.stopPropagation();
+      const offset = state.yearOffsets[String(year)];
+      if (offset !== undefined) scrollContainer.scrollTop = offset;
+    });
+    timelineLabels.appendChild(label);
+  }
+
+  timelineBar.addEventListener("pointerdown", startDrag);
+
+  timelineHandle.addEventListener("keydown", e => {
+    const delta = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
+    if (!delta) return;
+    e.preventDefault();
+    const next = currentYear() + delta;
+    const offset = state.yearOffsets[String(next)];
+    if (offset !== undefined) scrollContainer.scrollTop = offset;
+  });
+}
+
+function positionTimelineLabels() {
+  const labels = timelineLabels.querySelectorAll(".tl-label");
+  const handleFrac = scrollToBarFrac();
+
+  for (const label of labels) {
+    const year    = parseInt(label.dataset.year, 10);
+    const evenPos = yearToBarFrac(year);
+    label.style.top     = (evenPos * 100) + "%";
+    label.style.display = "";
+
+    const dist = Math.abs(evenPos - handleFrac);
+    const t    = Math.max(0, 1 - dist / 0.15); // 0→1 as dist→0
+    label.style.fontSize = (8 + t * 7) + "px"; // 8px → 15px near handle
+    label.style.opacity  = 0.4 + t * 0.6;
+  }
+}
+
+function currentYear() {
+  const scrollTop = scrollContainer.scrollTop;
+  let best = null;
+  for (const [year, offset] of Object.entries(state.yearOffsets)) {
+    if (offset <= scrollTop + 1) {
+      if (best === null || offset > state.yearOffsets[best]) best = year;
     }
   }
+  return best ? parseInt(best, 10) : YEAR_MIN;
 }
 
-function countNeighbors(col, row) {
-  let total = 0;
-  for (let y = -1; y <= 1; y += 1) {
-    for (let x = -1; x <= 1; x += 1) {
-      if (x === 0 && y === 0) {
-        continue;
-      }
-      const nextCol = (col + x + state.cols) % state.cols;
-      const nextRow = (row + y + state.rows) % state.rows;
-      total += state.cells[indexOfCell(nextCol, nextRow)];
-    }
-  }
-  return total;
+function syncTimelineHandle() {
+  const pct = scrollToBarFrac() * 100;
+  timelineHandle.style.top = pct + "%";
+  const year = currentYear();
+  timelineHandle.setAttribute("aria-valuenow", year);
+  timelineHandle.setAttribute("aria-valuetext", year);
 }
 
-function stepSimulation() {
-  for (let row = 0; row < state.rows; row += 1) {
-    for (let col = 0; col < state.cols; col += 1) {
-      const index = indexOfCell(col, row);
-      const alive = state.cells[index] === 1;
-      const neighbors = countNeighbors(col, row);
-      state.next[index] = neighbors === 3 || (alive && neighbors === 2) ? 1 : 0;
-    }
-  }
-
-  [state.cells, state.next] = [state.next, state.cells];
+function railPctFromY(clientY) {
+  const rect = timelineBar.getBoundingClientRect();
+  return Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
 }
 
-function drawGrid() {
-  ctx.strokeStyle = "rgba(88, 101, 242, 0.16)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
+function startDrag(e) {
+  e.preventDefault();
+  timelineBar.setPointerCapture(e.pointerId);
 
-  for (let x = 0; x <= state.cols; x += 1) {
-    const xPos = Math.round(x * state.cellSize) + 0.5;
-    ctx.moveTo(xPos, 0);
-    ctx.lineTo(xPos, state.rows * state.cellSize);
+  scrollContainer.scrollTop = barFracToScroll(railPctFromY(e.clientY));
+
+  function onMove(ev) {
+    scrollContainer.scrollTop = barFracToScroll(railPctFromY(ev.clientY));
   }
 
-  for (let y = 0; y <= state.rows; y += 1) {
-    const yPos = Math.round(y * state.cellSize) + 0.5;
-    ctx.moveTo(0, yPos);
-    ctx.lineTo(state.cols * state.cellSize, yPos);
+  function onUp() {
+    timelineBar.removeEventListener("pointermove", onMove);
+    timelineBar.removeEventListener("pointerup", onUp);
   }
 
-  ctx.stroke();
+  timelineBar.addEventListener("pointermove", onMove);
+  timelineBar.addEventListener("pointerup", onUp);
 }
 
-function drawCells() {
-  for (let row = 0; row < state.rows; row += 1) {
-    for (let col = 0; col < state.cols; col += 1) {
-      if (!state.cells[indexOfCell(col, row)]) {
-        continue;
-      }
+// ─── Region filters ──────────────────────────────────────────────────────────
 
-      const x = col * state.cellSize;
-      const y = row * state.cellSize;
-      const gradient = ctx.createLinearGradient(x, y, x + state.cellSize, y + state.cellSize);
-      gradient.addColorStop(0, "#57f287");
-      gradient.addColorStop(1, "#6ea7ff");
-      ctx.fillStyle = gradient;
-      ctx.fillRect(x + 1, y + 1, state.cellSize - 1, state.cellSize - 1);
-    }
+function buildRegionFilters() {
+  regionFilters.textContent = "";
+  for (const region of REGIONS) {
+    const label = document.createElement("label");
+    label.className = "region-filter-item";
+
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = true;
+    cb.dataset.region = region;
+    cb.addEventListener("change", () => {
+      if (cb.checked) state.activeRegions.add(region);
+      else state.activeRegions.delete(region);
+      applyFilters();
+    });
+
+    const pill = document.createElement("span");
+    pill.className = "region-pill";
+    pill.dataset.region = region;
+    pill.textContent = REGION_LABELS[region];
+
+    label.appendChild(cb);
+    label.appendChild(pill);
+    regionFilters.appendChild(label);
   }
 }
 
-function draw() {
-  ctx.clearRect(0, 0, state.width, state.height);
-  ctx.fillStyle = "#111317";
-  ctx.fillRect(0, 0, state.width, state.height);
-  drawGrid();
-  drawCells();
+// ─── Console filters ─────────────────────────────────────────────────────────
+
+function buildConsoleFilters(consoles) {
+  consoleFilters.textContent = "";
+  consoles.forEach(c => {
+    const label = document.createElement("label");
+    label.className = "console-filter-item";
+
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = true;
+    cb.dataset.console = c;
+    cb.addEventListener("change", () => {
+      if (cb.checked) state.activeConsoles.add(c);
+      else state.activeConsoles.delete(c);
+      applyFilters();
+    });
+
+    const badge = document.createElement("span");
+    badge.className = "console-badge";
+    badge.textContent = c;
+    badge.style.setProperty("--badge-color", CONSOLE_COLORS[c] || "#888");
+
+    label.appendChild(cb);
+    label.appendChild(badge);
+    consoleFilters.appendChild(label);
+  });
 }
 
-function animate(timestamp) {
-  const frameLength = 1000 / state.fps;
-  if (state.playing && timestamp - state.lastTick >= frameLength) {
-    stepSimulation();
-    state.lastTick = timestamp;
-  }
+// ─── Search & date filter events ─────────────────────────────────────────────
 
-  draw();
-  window.requestAnimationFrame(animate);
-}
-
-function eventToCell(event) {
-  const rect = canvas.getBoundingClientRect();
-  const col = Math.floor((event.clientX - rect.left) / state.cellSize);
-  const row = Math.floor((event.clientY - rect.top) / state.cellSize);
-
-  if (col < 0 || row < 0 || col >= state.cols || row >= state.rows) {
-    return null;
-  }
-
-  return { col, row };
-}
-
-function paintFromEvent(event) {
-  const cell = eventToCell(event);
-  if (!cell) {
-    return;
-  }
-  state.cells[indexOfCell(cell.col, cell.row)] = state.drawValue;
-}
-
-canvas.addEventListener("pointerdown", (event) => {
-  if (event.button !== 0) {
-    return;
-  }
-
-  const cell = eventToCell(event);
-  if (!cell) {
-    return;
-  }
-
-  const index = indexOfCell(cell.col, cell.row);
-  state.drawValue = state.cells[index] ? 0 : 1;
-  state.drawing = true;
-  canvas.setPointerCapture(event.pointerId);
-  state.cells[index] = state.drawValue;
+let searchTimer = null;
+document.getElementById("search-input").addEventListener("input", e => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    state.searchQuery = e.target.value.trim();
+    applyFilters();
+  }, SEARCH_DEBOUNCE);
 });
 
-canvas.addEventListener("pointermove", (event) => {
-  if (!state.drawing) {
-    return;
-  }
-  paintFromEvent(event);
+document.getElementById("date-from").addEventListener("change", e => {
+  const v = e.target.value;
+  state.dateFrom = v ? new Date(v + "T00:00:00") : null;
+  applyFilters();
 });
 
-canvas.addEventListener("pointerup", (event) => {
-  if (state.drawing) {
-    canvas.releasePointerCapture(event.pointerId);
-  }
-  state.drawing = false;
+// ─── Logo → scroll to top ─────────────────────────────────────────────────────
+
+wordmark.addEventListener("click", () => {
+  scrollContainer.scrollTop = 0;
 });
 
-canvas.addEventListener("pointerleave", () => {
-  state.drawing = false;
-});
+// ─── Scroll listener ─────────────────────────────────────────────────────────
 
-playButton.addEventListener("click", () => {
-  state.playing = !state.playing;
-  setButtonIcons();
-});
+scrollContainer.addEventListener("scroll", () => {
+  syncTimelineHandle();
+  positionTimelineLabels();
+}, { passive: true });
 
-stepButton.addEventListener("click", () => {
-  if (state.playing) {
-    return;
-  }
-  stepSimulation();
-  draw();
-});
+// ─── Boot ─────────────────────────────────────────────────────────────────────
 
-resetButton.addEventListener("click", () => {
-  seedHelloWord();
-  draw();
-});
-
-fpsSlider.addEventListener("input", () => {
-  state.fps = Number(fpsSlider.value);
-  fpsOutput.value = String(state.fps);
-});
-
-cellSizeSlider.addEventListener("input", () => {
-  state.cellSize = Number(cellSizeSlider.value);
-  cellSizeOutput.value = String(state.cellSize);
-  resizeBoard({ resetPattern: true });
-});
-
-window.addEventListener("resize", () => resizeBoard({ resetPattern: true }));
-
-fpsOutput.value = fpsSlider.value;
-cellSizeOutput.value = cellSizeSlider.value;
-setButtonIcons();
-resizeBoard({ resetPattern: true });
-window.requestAnimationFrame(animate);
+loadGames();

@@ -1,7 +1,7 @@
 [project]
-name = "spawnet"
+name = "chronoGamer"
 version = "0.1.0"
-description = "Tiny Python SPA host and packager demo."
+description = "Retro game chronological timeline browser (pre-PS2 era, US releases)."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

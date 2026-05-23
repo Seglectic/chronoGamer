@@ -1,34 +1,54 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>helloShim</title>
-    <link rel="stylesheet" href="/styles.css">
-  </head>
-  <body>
-    <canvas id="life-canvas" aria-label="Conway's Game of Life"></canvas>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>chronoGamer</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div id="layout">
+    <div id="app">
+      <header id="toolbar">
+        <div id="toolbar-left">
+          <button id="wordmark" type="button" aria-label="Scroll to top">chrono<span class="accent">Gamer</span></button>
+          <input id="search-input" type="search" placeholder="Search games…" autocomplete="off" spellcheck="false">
+          <label id="date-filter">
+            <span class="filter-label">From</span>
+            <input id="date-from" type="date" min="1977-01-01" max="2000-12-31">
+          </label>
+          <div id="region-filters"></div>
+        </div>
+        <div id="console-filters"></div>
+      </header>
 
-    <section class="control-panel" aria-label="Simulation controls">
-      <div class="button-row">
-        <button id="play-toggle" class="icon-button is-active" type="button" aria-label="Pause simulation"></button>
-        <button id="step-button" class="icon-button" type="button" aria-label="Step simulation"></button>
-        <button id="reset-button" class="icon-button" type="button" aria-label="Reset simulation"></button>
+      <div id="list-header">
+        <span class="col-date">Date</span>
+        <span class="col-console">Console</span>
+        <span class="col-title">Title</span>
+        <span id="game-count"></span>
       </div>
 
-      <label class="control">
-        <span>FPS</span>
-        <input id="fps-slider" type="range" min="5" max="60" value="18">
-        <output id="fps-output" for="fps-slider">18</output>
-      </label>
+      <div id="scroll-container">
+        <div id="game-list"></div>
+      </div>
+    </div>
 
-      <label class="control">
-        <span>Cell</span>
-        <input id="cell-size-slider" type="range" min="6" max="28" value="12">
-        <output id="cell-size-output" for="cell-size-slider">12</output>
-      </label>
-    </section>
+    <aside id="timeline-rail">
+      <div id="timeline-bar">
+        <div id="timeline-labels"></div>
+        <div id="timeline-handle" role="slider" aria-label="Jump to year" tabindex="0"></div>
+      </div>
+    </aside>
+  </div>
 
-    <script src="/app.js"></script>
-  </body>
-  </html>
+  <div id="loading">
+    <div id="loading-inner">
+      <div class="spinner"></div>
+      <span>Loading game library…</span>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
