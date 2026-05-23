@@ -383,6 +383,26 @@ function buildRegionFilters() {
 
 function buildConsoleFilters(consoles) {
   consoleFilters.textContent = "";
+
+  const toggleBtn = document.createElement("button");
+  toggleBtn.className = "console-toggle-btn";
+  toggleBtn.textContent = "None";
+  toggleBtn.addEventListener("click", () => {
+    const allChecked = state.activeConsoles.size === consoles.length;
+    const cbs = consoleFilters.querySelectorAll("input[type=checkbox]");
+    if (allChecked) {
+      state.activeConsoles.clear();
+      cbs.forEach(cb => { cb.checked = false; });
+      toggleBtn.textContent = "All";
+    } else {
+      consoles.forEach(c => state.activeConsoles.add(c));
+      cbs.forEach(cb => { cb.checked = true; });
+      toggleBtn.textContent = "None";
+    }
+    applyFilters();
+  });
+  consoleFilters.appendChild(toggleBtn);
+
   consoles.forEach(c => {
     const label = document.createElement("label");
     label.className = "console-filter-item";
@@ -394,6 +414,8 @@ function buildConsoleFilters(consoles) {
     cb.addEventListener("change", () => {
       if (cb.checked) state.activeConsoles.add(c);
       else state.activeConsoles.delete(c);
+      const allChecked = state.activeConsoles.size === consoles.length;
+      toggleBtn.textContent = allChecked ? "None" : "All";
       applyFilters();
     });
 

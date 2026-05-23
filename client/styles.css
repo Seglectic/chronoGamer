@@ -212,6 +212,28 @@ html, body {
 
 #console-filters::-webkit-scrollbar { display: none; }
 
+.console-toggle-btn {
+  flex: none;
+  height: 24px;
+  padding: 0 10px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 120ms, color 120ms;
+}
+
+.console-toggle-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .console-filter-item {
   display: flex;
   align-items: center;
@@ -308,6 +330,7 @@ html, body {
 }
 
 .game-row:hover { background: rgba(255, 255, 255, 0.03); }
+.game-row .console-badge { justify-self: start; }
 
 .col-date {
   font-family: var(--mono);
