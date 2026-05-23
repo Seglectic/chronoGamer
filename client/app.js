@@ -57,6 +57,27 @@ const gameCount       = document.getElementById("game-count");
 const loading         = document.getElementById("loading");
 const wordmark        = document.getElementById("wordmark");
 
+// ─── Persistence ──────────────────────────────────────────────────────────────
+
+const STORAGE_KEY = "chronogamer_prefs";
+
+function savePrefs() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      activeConsoles: [...state.activeConsoles],
+      activeRegions:  [...state.activeRegions],
+      searchQuery:    state.searchQuery,
+      dateFrom:       state.dateFrom ? state.dateFrom.toISOString().slice(0, 10) : null,
+      scrollTop:      scrollContainer.scrollTop,
+    }));
+  } catch (_) {}
+}
+
+function loadPrefs() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "null"); }
+  catch (_) { return null; }
+}
+
 // ─── Data loading ─────────────────────────────────────────────────────────────
 
 async function loadGames() {
@@ -64,12 +85,34 @@ async function loadGames() {
   state.allGames = await res.json();
 
   const consoles = [...new Set(state.allGames.map(g => g.console))].sort();
-  state.activeConsoles = new Set(consoles);
+  const prefs = loadPrefs();
+
+  if (prefs) {
+    const validConsoles = new Set(consoles);
+    state.activeConsoles = new Set((prefs.activeConsoles || []).filter(c => validConsoles.has(c)));
+    state.activeRegions  = new Set((prefs.activeRegions  || []).filter(r => REGIONS.includes(r)));
+    state.searchQuery    = prefs.searchQuery || "";
+    state.dateFrom       = prefs.dateFrom ? new Date(prefs.dateFrom + "T00:00:00") : null;
+    if (!state.activeConsoles.size) state.activeConsoles = new Set(consoles);
+    if (!state.activeRegions.size)  state.activeRegions  = new Set(REGIONS);
+  } else {
+    state.activeConsoles = new Set(consoles);
+  }
 
   buildConsoleFilters(consoles);
   buildRegionFilters();
+
+  if (prefs?.searchQuery)  document.getElementById("search-input").value = prefs.searchQuery;
+  if (prefs?.dateFrom)     document.getElementById("date-from").value    = prefs.dateFrom;
+
   initTimeline();
   applyFilters();
+
+  if (prefs?.scrollTop) {
+    scrollContainer.scrollTop = prefs.scrollTop;
+    syncTimelineHandle();
+    positionTimelineLabels();
+  }
 
   loading.style.display = "none";
 }
@@ -92,6 +135,7 @@ function applyFilters() {
   gameCount.textContent = state.filtered.length.toLocaleString() + " games";
   renderList();
   syncTimelineHandle();
+  savePrefs();
 }
 
 // ─── Virtual scroller ────────────────────────────────────────────────────────
@@ -360,7 +404,7 @@ function buildRegionFilters() {
 
     const cb = document.createElement("input");
     cb.type = "checkbox";
-    cb.checked = true;
+    cb.checked = state.activeRegions.has(region);
     cb.dataset.region = region;
     cb.addEventListener("change", () => {
       if (cb.checked) state.activeRegions.add(region);
@@ -386,7 +430,7 @@ function buildConsoleFilters(consoles) {
 
   const toggleBtn = document.createElement("button");
   toggleBtn.className = "console-toggle-btn";
-  toggleBtn.textContent = "None";
+  toggleBtn.textContent = state.activeConsoles.size === consoles.length ? "None" : "All";
   toggleBtn.addEventListener("click", () => {
     const allChecked = state.activeConsoles.size === consoles.length;
     const cbs = consoleFilters.querySelectorAll("input[type=checkbox]");
@@ -409,7 +453,7 @@ function buildConsoleFilters(consoles) {
 
     const cb = document.createElement("input");
     cb.type = "checkbox";
-    cb.checked = true;
+    cb.checked = state.activeConsoles.has(c);
     cb.dataset.console = c;
     cb.addEventListener("change", () => {
       if (cb.checked) state.activeConsoles.add(c);
@@ -455,10 +499,13 @@ wordmark.addEventListener("click", () => {
 
 // ─── Scroll listener ─────────────────────────────────────────────────────────
 
+let scrollSaveTimer = null;
 scrollContainer.addEventListener("scroll", () => {
   renderVisible();
   syncTimelineHandle();
   positionTimelineLabels();
+  clearTimeout(scrollSaveTimer);
+  scrollSaveTimer = setTimeout(savePrefs, 300);
 }, { passive: true });
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
