@@ -287,9 +287,17 @@ html, body {
   border-radius: 3px;
 }
 
+/* ── Game list (virtual scroll container) ────────────────────────────────────── */
+
+#game-list {
+  position: relative;
+}
+
 /* ── Game rows ────────────────────────────────────────────────────────────────── */
 
 .game-row {
+  position: absolute;
+  left: 0; right: 0;
   display: grid;
   grid-template-columns: 120px 155px 1fr;
   align-items: center;
@@ -319,6 +327,8 @@ html, body {
 /* ── Year headers ─────────────────────────────────────────────────────────────── */
 
 .year-header {
+  position: absolute;
+  left: 0; right: 0;
   display: flex;
   align-items: center;
   height: 34px;
@@ -330,8 +340,6 @@ html, body {
   letter-spacing: 0.15em;
   text-transform: uppercase;
   color: var(--accent);
-  position: sticky;
-  top: 0;
   z-index: 2;
 }
 

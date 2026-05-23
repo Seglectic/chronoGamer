@@ -39,7 +39,7 @@ const state = {
   activeRegions:  new Set(REGIONS),
   searchQuery:    "",
   dateFrom:       null,
-  // year → pixel offset from top of game-list (computed at render time)
+  rows:           [],   // flat pre-computed [{type,data,offset}]
   yearOffsets:    {},
   totalHeight:    0,
 };
@@ -94,30 +94,72 @@ function applyFilters() {
   syncTimelineHandle();
 }
 
-function renderList() {
-  const frag       = document.createDocumentFragment();
-  let lastYear     = null;
-  let offset       = 0;
+// ─── Virtual scroller ────────────────────────────────────────────────────────
+
+const OVERSCAN_PX = 600;
+let renderedRange = { start: 0, end: 0 };
+
+function buildRowIndex() {
+  const rows = [];
   const yearOffsets = {};
+  let offset = 0;
+  let lastYear = null;
 
   for (const g of state.filtered) {
     const year = g.releaseDate.slice(0, 4);
     if (year !== lastYear) {
       yearOffsets[year] = offset;
-      frag.appendChild(createHeaderRow(year));
-      offset  += ROW_HEIGHT_HDR;
+      rows.push({ type: "header", year, offset });
+      offset += ROW_HEIGHT_HDR;
       lastYear = year;
     }
-    frag.appendChild(createGameRow(g));
+    rows.push({ type: "game", game: g, offset });
     offset += ROW_HEIGHT_GAME;
   }
 
+  state.rows = rows;
   state.yearOffsets = yearOffsets;
   state.totalHeight = offset;
+  gameList.style.height = offset + "px";
+}
 
+function renderVisible() {
+  const scrollTop  = scrollContainer.scrollTop;
+  const viewHeight = scrollContainer.clientHeight;
+  const top        = scrollTop - OVERSCAN_PX;
+  const bottom     = scrollTop + viewHeight + OVERSCAN_PX;
+  const rows       = state.rows;
+
+  // Binary search for first row in the window
+  let lo = 0, hi = rows.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    const r   = rows[mid];
+    const rh  = r.type === "header" ? ROW_HEIGHT_HDR : ROW_HEIGHT_GAME;
+    if (r.offset + rh <= top) lo = mid + 1; else hi = mid;
+  }
+  const start = lo;
+  let end = start;
+  while (end < rows.length && rows[end].offset < bottom) end++;
+
+  if (start === renderedRange.start && end === renderedRange.end) return;
+  renderedRange = { start, end };
+
+  const frag = document.createDocumentFragment();
+  for (let i = start; i < end; i++) {
+    const r  = rows[i];
+    const el = r.type === "header" ? createHeaderRow(r.year) : createGameRow(r.game);
+    el.style.top = r.offset + "px";
+    frag.appendChild(el);
+  }
   gameList.textContent = "";
   gameList.appendChild(frag);
+}
 
+function renderList() {
+  buildRowIndex();
+  renderedRange = { start: -1, end: -1 }; // force fresh render
+  renderVisible();
   positionTimelineLabels();
 }
 
@@ -392,6 +434,7 @@ wordmark.addEventListener("click", () => {
 // ─── Scroll listener ─────────────────────────────────────────────────────────
 
 scrollContainer.addEventListener("scroll", () => {
+  renderVisible();
   syncTimelineHandle();
   positionTimelineLabels();
 }, { passive: true });
