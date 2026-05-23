@@ -60,7 +60,7 @@ const wordmark        = document.getElementById("wordmark");
 // ─── Data loading ─────────────────────────────────────────────────────────────
 
 async function loadGames() {
-  const res = await fetch("/games.json");
+  const res = await fetch("games.json");
   state.allGames = await res.json();
 
   const consoles = [...new Set(state.allGames.map(g => g.console))].sort();
