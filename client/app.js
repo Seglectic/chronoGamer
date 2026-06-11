@@ -6,6 +6,16 @@ const SEARCH_DEBOUNCE  = 150;
 const ROW_HEIGHT_GAME  = 46;
 const ROW_HEIGHT_HDR   = 34;
 
+const MANUFACTURERS = [
+  { name: "Atari",    consoles: ["Atari 2600", "Atari 7800"] },
+  { name: "Nintendo", consoles: ["NES", "Game Boy", "SNES", "N64", "Game Boy Color"] },
+  { name: "Sega",     consoles: ["SMS", "Genesis", "Sega CD", "32X", "Saturn", "Dreamcast"] },
+  { name: "NEC",      consoles: ["TurboGrafx-16"] },
+  { name: "SNK",      consoles: ["Neo Geo"] },
+  { name: "3DO",      consoles: ["3DO"] },
+  { name: "Sony",     consoles: ["PlayStation"] },
+];
+
 const CONSOLE_COLORS = {
   "Atari 2600":    "#e03a3a",
   "Atari 7800":    "#c94040",
@@ -34,6 +44,7 @@ const REGION_LABELS = { NA: "NA", JP: "JP", PAL: "PAL" };
 
 const state = {
   allGames:       [],
+  allConsoles:    [],
   filtered:       [],
   activeConsoles: new Set(),
   activeRegions:  new Set(REGIONS),
@@ -46,18 +57,20 @@ const state = {
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 
-const scrollContainer = document.getElementById("scroll-container");
-const gameList        = document.getElementById("game-list");
-const timelineBar     = document.getElementById("timeline-bar");
-const timelineLabels  = document.getElementById("timeline-labels");
-const timelineHandle  = document.getElementById("timeline-handle");
-const consoleFilters  = document.getElementById("console-filters");
-const regionFilters   = document.getElementById("region-filters");
-const gameCount       = document.getElementById("game-count");
-const loading         = document.getElementById("loading");
-const wordmark        = document.getElementById("wordmark");
-const toolbar         = document.getElementById("toolbar");
-const filterToggle    = document.getElementById("filter-toggle");
+const scrollContainer   = document.getElementById("scroll-container");
+const gameList          = document.getElementById("game-list");
+const timelineBar       = document.getElementById("timeline-bar");
+const timelineLabels    = document.getElementById("timeline-labels");
+const timelineHandle    = document.getElementById("timeline-handle");
+const regionFilters     = document.getElementById("region-filters");
+const gameCount         = document.getElementById("game-count");
+const loading           = document.getElementById("loading");
+const wordmark          = document.getElementById("wordmark");
+const toolbar           = document.getElementById("toolbar");
+const filterToggle      = document.getElementById("filter-toggle");
+const consoleBtnEl      = document.getElementById("console-btn");
+const consoleModal      = document.getElementById("console-modal");
+const consoleModalBody  = document.getElementById("console-modal-body");
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
 
@@ -88,6 +101,7 @@ async function loadGames() {
   state.allGames = await res.json();
 
   const consoles = [...new Set(state.allGames.map(g => g.console))].sort();
+  state.allConsoles = consoles;
   const prefs = loadPrefs();
 
   if (prefs) {
@@ -102,7 +116,7 @@ async function loadGames() {
     state.activeConsoles = new Set(consoles);
   }
 
-  buildConsoleFilters(consoles);
+  buildConsoleModal(consoles);
   buildRegionFilters();
 
   if (prefs?.searchQuery)  document.getElementById("search-input").value = prefs.searchQuery;
@@ -137,6 +151,7 @@ function applyFilters() {
   });
 
   gameCount.textContent = state.filtered.length.toLocaleString() + " games";
+  updateConsoleBtnLabel();
   renderList();
   syncTimelineHandle();
   savePrefs();
@@ -427,56 +442,129 @@ function buildRegionFilters() {
   }
 }
 
-// ─── Console filters ─────────────────────────────────────────────────────────
+// ─── Console modal ────────────────────────────────────────────────────────────
 
-function buildConsoleFilters(consoles) {
-  consoleFilters.textContent = "";
+function updateConsoleBtnLabel() {
+  const n = state.activeConsoles.size;
+  const total = state.allConsoles.length;
+  consoleBtnEl.textContent = `Consoles (${n})`;
+  consoleBtnEl.classList.toggle("has-filter", n < total);
+}
 
-  const toggleBtn = document.createElement("button");
-  toggleBtn.className = "console-toggle-btn";
-  toggleBtn.textContent = state.activeConsoles.size === consoles.length ? "None" : "All";
-  toggleBtn.addEventListener("click", () => {
-    const allChecked = state.activeConsoles.size === consoles.length;
-    const cbs = consoleFilters.querySelectorAll("input[type=checkbox]");
-    if (allChecked) {
-      state.activeConsoles.clear();
-      cbs.forEach(cb => { cb.checked = false; });
-      toggleBtn.textContent = "All";
-    } else {
-      consoles.forEach(c => state.activeConsoles.add(c));
-      cbs.forEach(cb => { cb.checked = true; });
-      toggleBtn.textContent = "None";
-    }
-    applyFilters();
-  });
-  consoleFilters.appendChild(toggleBtn);
+function buildConsoleModal(consoles) {
+  const consoleSet = new Set(consoles);
+  consoleModalBody.textContent = "";
 
-  consoles.forEach(c => {
-    const label = document.createElement("label");
-    label.className = "console-filter-item";
+  for (const mfr of MANUFACTURERS) {
+    const mfrConsoles = mfr.consoles.filter(c => consoleSet.has(c));
+    if (!mfrConsoles.length) continue;
 
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.checked = state.activeConsoles.has(c);
-    cb.dataset.console = c;
-    cb.addEventListener("change", () => {
-      if (cb.checked) state.activeConsoles.add(c);
-      else state.activeConsoles.delete(c);
-      const allChecked = state.activeConsoles.size === consoles.length;
-      toggleBtn.textContent = allChecked ? "None" : "All";
+    const group = document.createElement("div");
+    group.className = "mfr-group";
+
+    const header = document.createElement("div");
+    header.className = "mfr-header";
+
+    const nameEl = document.createElement("span");
+    nameEl.className = "mfr-name";
+    nameEl.textContent = mfr.name;
+
+    const toggleBtn = document.createElement("button");
+    toggleBtn.type = "button";
+    toggleBtn.className = "mfr-toggle-btn";
+
+    const refreshToggleBtn = () => {
+      const allOn = mfrConsoles.every(c => state.activeConsoles.has(c));
+      toggleBtn.textContent = allOn ? "None" : "All";
+    };
+    refreshToggleBtn();
+
+    toggleBtn.addEventListener("click", () => {
+      const allOn = mfrConsoles.every(c => state.activeConsoles.has(c));
+      mfrConsoles.forEach(c => {
+        if (allOn) state.activeConsoles.delete(c);
+        else state.activeConsoles.add(c);
+      });
+      group.querySelectorAll("input[type=checkbox]").forEach(cb => {
+        cb.checked = state.activeConsoles.has(cb.dataset.console);
+      });
+      refreshToggleBtn();
+      updateConsoleBtnLabel();
       applyFilters();
     });
 
-    const badge = document.createElement("span");
-    badge.className = "console-badge";
-    badge.textContent = c;
-    badge.style.setProperty("--badge-color", CONSOLE_COLORS[c] || "#888");
+    header.appendChild(nameEl);
+    header.appendChild(toggleBtn);
 
-    label.appendChild(cb);
-    label.appendChild(badge);
-    consoleFilters.appendChild(label);
-  });
+    const consolesRow = document.createElement("div");
+    consolesRow.className = "mfr-consoles";
+
+    for (const c of mfrConsoles) {
+      const label = document.createElement("label");
+      label.className = "console-filter-item";
+
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = state.activeConsoles.has(c);
+      cb.dataset.console = c;
+      cb.addEventListener("change", () => {
+        if (cb.checked) state.activeConsoles.add(c);
+        else state.activeConsoles.delete(c);
+        refreshToggleBtn();
+        updateConsoleBtnLabel();
+        applyFilters();
+      });
+
+      const badge = document.createElement("span");
+      badge.className = "console-badge";
+      badge.textContent = c;
+      badge.style.setProperty("--badge-color", CONSOLE_COLORS[c] || "#888");
+
+      label.appendChild(cb);
+      label.appendChild(badge);
+      consolesRow.appendChild(label);
+    }
+
+    group.appendChild(header);
+    group.appendChild(consolesRow);
+    consoleModalBody.appendChild(group);
+  }
+
+  updateConsoleBtnLabel();
 }
+
+function openConsoleModal() {
+  consoleModal.classList.add("open");
+  document.getElementById("console-modal-close").focus();
+}
+
+function closeConsoleModal() {
+  consoleModal.classList.remove("open");
+  consoleBtnEl.focus();
+}
+
+consoleBtnEl.addEventListener("click", openConsoleModal);
+document.getElementById("console-modal-close").addEventListener("click", closeConsoleModal);
+document.getElementById("console-all-btn").addEventListener("click", () => {
+  state.allConsoles.forEach(c => state.activeConsoles.add(c));
+  consoleModalBody.querySelectorAll("input[type=checkbox]").forEach(cb => { cb.checked = true; });
+  consoleModalBody.querySelectorAll(".mfr-toggle-btn").forEach(btn => { btn.textContent = "None"; });
+  updateConsoleBtnLabel();
+  applyFilters();
+});
+document.getElementById("console-none-btn").addEventListener("click", () => {
+  state.activeConsoles.clear();
+  consoleModalBody.querySelectorAll("input[type=checkbox]").forEach(cb => { cb.checked = false; });
+  consoleModalBody.querySelectorAll(".mfr-toggle-btn").forEach(btn => { btn.textContent = "All"; });
+  updateConsoleBtnLabel();
+  applyFilters();
+});
+consoleModal.addEventListener("click", e => {
+  if (e.target === consoleModal) closeConsoleModal();
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && consoleModal.classList.contains("open")) closeConsoleModal();
+});
 
 // ─── Search & date filter events ─────────────────────────────────────────────
 

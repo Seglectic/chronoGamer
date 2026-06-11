@@ -240,23 +240,88 @@ html, body {
   filter: grayscale(0.5);
 }
 
-/* ── Console filter pills ─────────────────────────────────────────────────────── */
+/* ── Console button ───────────────────────────────────────────────────────────── */
 
-#console-filters {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  flex: 1;
-  overflow-x: auto;
-  scrollbar-width: none;
+#console-btn {
+  flex: none;
+  height: 30px;
+  padding: 0 12px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 120ms, color 120ms;
 }
 
-#console-filters::-webkit-scrollbar { display: none; }
+#console-btn:hover { border-color: rgba(255,255,255,0.2); }
 
-.console-toggle-btn {
+#console-btn.has-filter {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── Console modal ────────────────────────────────────────────────────────────── */
+
+#console-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 20px;
+}
+
+#console-modal.open {
+  display: flex;
+}
+
+#console-modal-box {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  width: 100%;
+  max-width: 440px;
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#console-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border);
   flex: none;
+  gap: 10px;
+}
+
+#console-modal-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+#console-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#console-all-btn,
+#console-none-btn {
   height: 24px;
-  padding: 0 10px;
+  padding: 0 9px;
   background: none;
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -270,9 +335,91 @@ html, body {
   transition: border-color 120ms, color 120ms;
 }
 
-.console-toggle-btn:hover {
+#console-all-btn:hover,
+#console-none-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+#console-modal-close {
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: color 120ms, background 120ms;
+  margin-left: 2px;
+}
+
+#console-modal-close:hover {
+  color: var(--text);
+  background: rgba(255,255,255,0.06);
+}
+
+#console-modal-body {
+  overflow-y: auto;
+  flex: 1;
+  padding: 6px 0 10px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+
+/* ── Manufacturer groups ──────────────────────────────────────────────────────── */
+
+.mfr-group {
+  padding: 12px 16px;
+}
+
+.mfr-group + .mfr-group {
+  border-top: 1px solid var(--border);
+}
+
+.mfr-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 9px;
+}
+
+.mfr-name {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.mfr-toggle-btn {
+  height: 20px;
+  padding: 0 7px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 120ms, color 120ms;
+}
+
+.mfr-toggle-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.mfr-consoles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .console-filter-item {
@@ -505,31 +652,18 @@ html, body {
     display: inline-flex;
   }
 
-  /* Filter panel: hidden by default, full-width scrollable row when open */
+  /* Filter panel: hidden by default, compact row when open */
   #filter-panel {
     display: none;
     width: 100%;
     gap: 10px;
-    overflow-x: auto;
-    overflow-y: visible;
-    scrollbar-width: none;
     padding-bottom: 2px;
-    /* Fade hint on right edge signals scrollable content */
-    mask-image: linear-gradient(to right, black calc(100% - 40px), transparent 100%);
-    -webkit-mask-image: linear-gradient(to right, black calc(100% - 40px), transparent 100%);
   }
-
-  #filter-panel::-webkit-scrollbar { display: none; }
 
   #toolbar.filters-open #filter-panel {
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     align-items: center;
-  }
-
-  /* Console filters expand to content width inside the scrolling panel */
-  #console-filters {
-    flex: none;
   }
 
   /* Timeline: taller handle fills full rail width (labels are hidden) */

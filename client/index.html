@@ -36,7 +36,7 @@
             <input id="date-from" type="date" min="1977-01-01" max="2000-12-31">
           </label>
           <div id="region-filters"></div>
-          <div id="console-filters"></div>
+          <button id="console-btn" type="button">Consoles</button>
         </div>
       </header>
 
@@ -58,6 +58,20 @@
         <div id="timeline-handle" role="slider" aria-label="Jump to year" tabindex="0"></div>
       </div>
     </aside>
+  </div>
+
+  <div id="console-modal" role="dialog" aria-modal="true" aria-labelledby="console-modal-title">
+    <div id="console-modal-box">
+      <div id="console-modal-header">
+        <span id="console-modal-title">Consoles</span>
+        <div id="console-modal-actions">
+          <button id="console-all-btn" type="button">All</button>
+          <button id="console-none-btn" type="button">None</button>
+          <button id="console-modal-close" type="button" aria-label="Close">✕</button>
+        </div>
+      </div>
+      <div id="console-modal-body"></div>
+    </div>
   </div>
 
   <div id="loading">
