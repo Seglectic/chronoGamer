@@ -14,6 +14,12 @@
 - Preserve the ability to build self-contained artifacts from `spawn.py build`.
 - Avoid hardcoding specific asset filenames in the bundling path; package the full `client/` tree.
 
+## Deployment
+
+- Pushing to `main` automatically deploys `client/` to GitHub Pages via `.github/workflows/deploy.yml`.
+- No build step is needed — the workflow uploads the `client/` directory directly as a Pages artifact.
+- Live site: https://seglectic.com/chronoGamer/
+
 ## Packaging Guidance
 
 - `py` and `pyz` builds should work cross-platform anywhere Python 3 is available.
