@@ -427,6 +427,71 @@ html, body {
   outline: none;
 }
 
+/* ── Mobile responsive ────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  :root {
+    --rail-w: 44px;
+  }
+
+  /* Toolbar wraps to two rows */
+  #toolbar {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  #toolbar-left {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  #wordmark {
+    font-size: 22px;
+  }
+
+  /* Search stretches to fill first row alongside wordmark */
+  #search-input {
+    width: auto;
+    flex: 1;
+    min-width: 80px;
+  }
+
+  /* Console filter row is full width and scrolls */
+  #console-filters {
+    width: 100%;
+  }
+
+  /* Hide timeline year labels — rail is too narrow to show them */
+  .tl-label {
+    display: none;
+  }
+
+  /* Tighter column widths so the title actually gets space */
+  #list-header {
+    grid-template-columns: 90px 88px 1fr auto;
+    padding: 0 10px;
+    font-size: 10px;
+  }
+
+  .game-row {
+    grid-template-columns: 90px 88px 1fr;
+    padding: 0 10px;
+  }
+
+  /* Prevent date from overflowing its column */
+  .col-date {
+    overflow: hidden;
+  }
+
+  /* Game count crowds the title header at narrow widths */
+  #game-count {
+    display: none;
+  }
+}
+
 /* ── Loading overlay ──────────────────────────────────────────────────────────── */
 
 #loading {
