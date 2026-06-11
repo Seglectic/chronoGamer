@@ -56,6 +56,8 @@ const regionFilters   = document.getElementById("region-filters");
 const gameCount       = document.getElementById("game-count");
 const loading         = document.getElementById("loading");
 const wordmark        = document.getElementById("wordmark");
+const toolbar         = document.getElementById("toolbar");
+const filterToggle    = document.getElementById("filter-toggle");
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
 
@@ -64,11 +66,12 @@ const STORAGE_KEY = "chronogamer_prefs";
 function savePrefs() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      activeConsoles: [...state.activeConsoles],
-      activeRegions:  [...state.activeRegions],
-      searchQuery:    state.searchQuery,
-      dateFrom:       state.dateFrom ? state.dateFrom.toISOString().slice(0, 10) : null,
-      scrollTop:      scrollContainer.scrollTop,
+      activeConsoles:  [...state.activeConsoles],
+      activeRegions:   [...state.activeRegions],
+      searchQuery:     state.searchQuery,
+      dateFrom:        state.dateFrom ? state.dateFrom.toISOString().slice(0, 10) : null,
+      scrollTop:       scrollContainer.scrollTop,
+      filtersOpen:     toolbar.classList.contains("filters-open"),
     }));
   } catch (_) {}
 }
@@ -104,6 +107,7 @@ async function loadGames() {
 
   if (prefs?.searchQuery)  document.getElementById("search-input").value = prefs.searchQuery;
   if (prefs?.dateFrom)     document.getElementById("date-from").value    = prefs.dateFrom;
+  setFiltersOpen(prefs?.filtersOpen ?? true);
 
   initTimeline();
   applyFilters();
@@ -489,6 +493,19 @@ document.getElementById("date-from").addEventListener("change", e => {
   const v = e.target.value;
   state.dateFrom = v ? new Date(v + "T00:00:00") : null;
   applyFilters();
+});
+
+// ─── Filter panel toggle (mobile) ────────────────────────────────────────────
+
+function setFiltersOpen(open) {
+  toolbar.classList.toggle("filters-open", open);
+  filterToggle.classList.toggle("active", open);
+  filterToggle.setAttribute("aria-expanded", open);
+}
+
+filterToggle.addEventListener("click", () => {
+  setFiltersOpen(!toolbar.classList.contains("filters-open"));
+  savePrefs();
 });
 
 // ─── Logo → scroll to top ─────────────────────────────────────────────────────

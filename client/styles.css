@@ -80,6 +80,47 @@ html, body {
   flex: none;
 }
 
+/* ── Filter panel (date + region + console pills) ────────────────────────────── */
+
+#filter-panel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ── Filter toggle (mobile-only button) ──────────────────────────────────────── */
+
+#filter-toggle {
+  display: none;
+  height: 32px;
+  padding: 0 12px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  cursor: pointer;
+  align-items: center;
+  transition: border-color 120ms, color 120ms;
+}
+
+#filter-toggle:hover {
+  border-color: rgba(255,255,255,0.18);
+  color: var(--text);
+}
+
+#filter-toggle.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* ── Logo / wordmark ─────────────────────────────────────────────────────────── */
 
 #wordmark {
@@ -434,17 +475,18 @@ html, body {
     --rail-w: 44px;
   }
 
-  /* Toolbar wraps to two rows */
+  /* Toolbar: single top row + optional filter row beneath */
   #toolbar {
     flex-wrap: wrap;
     height: auto;
     padding: 8px 12px;
     gap: 8px;
+    overflow: visible;
   }
 
+  /* Top row: wordmark + search + toggle button */
   #toolbar-left {
     width: 100%;
-    flex-wrap: wrap;
     gap: 8px;
   }
 
@@ -452,21 +494,53 @@ html, body {
     font-size: 22px;
   }
 
-  /* Search stretches to fill first row alongside wordmark */
   #search-input {
     width: auto;
     flex: 1;
     min-width: 80px;
   }
 
-  /* Console filter row is full width and scrolls */
-  #console-filters {
-    width: 100%;
+  /* Show the filter toggle button on mobile */
+  #filter-toggle {
+    display: inline-flex;
   }
 
-  /* Hide timeline year labels — rail is too narrow to show them */
+  /* Filter panel: hidden by default, full-width scrollable row when open */
+  #filter-panel {
+    display: none;
+    width: 100%;
+    gap: 10px;
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+    /* Fade hint on right edge signals scrollable content */
+    mask-image: linear-gradient(to right, black calc(100% - 40px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, black calc(100% - 40px), transparent 100%);
+  }
+
+  #filter-panel::-webkit-scrollbar { display: none; }
+
+  #toolbar.filters-open #filter-panel {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  /* Console filters expand to content width inside the scrolling panel */
+  #console-filters {
+    flex: none;
+  }
+
+  /* Timeline: taller handle fills full rail width (labels are hidden) */
   .tl-label {
     display: none;
+  }
+
+  #timeline-handle {
+    right: 4px;
+    height: 44px;
+    border-radius: 8px;
   }
 
   /* Tighter column widths so the title actually gets space */

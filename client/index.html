@@ -28,13 +28,16 @@
         <div id="toolbar-left">
           <button id="wordmark" type="button" aria-label="Scroll to top">chrono<span class="accent">Gamer</span></button>
           <input id="search-input" type="search" placeholder="Search games…" autocomplete="off" spellcheck="false">
+          <button id="filter-toggle" type="button" aria-label="Toggle filters" aria-expanded="false">Filters</button>
+        </div>
+        <div id="filter-panel">
           <label id="date-filter">
             <span class="filter-label">From</span>
             <input id="date-from" type="date" min="1977-01-01" max="2000-12-31">
           </label>
           <div id="region-filters"></div>
+          <div id="console-filters"></div>
         </div>
-        <div id="console-filters"></div>
       </header>
 
       <div id="list-header">
